@@ -1,0 +1,10 @@
+name = "graduation-wish-tree"
+compatibility_date = "2026-07-01"
+pages_build_output_dir = "public"
+
+# 本地开发可以新建 .dev.vars，注意不要上传到 GitHub。
+# GITHUB_TOKEN="ghp_xxx"
+# GITHUB_OWNER="你的GitHub用户名"
+# GITHUB_REPO="你的仓库名"
+# GITHUB_BRANCH="main"
+# GITHUB_FILE_PATH="data/messages.json"
