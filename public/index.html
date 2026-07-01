@@ -3,27 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#07111f" />
-  <meta name="description" content="毕业留言圣诞树：把每一句留言挂到圣诞树上" />
+  <meta name="theme-color" content="#02040d" />
+  <meta name="description" content="毕业留言圣诞树：真实发射烟花、圣诞树留言挂件、手机端优化、留言写入 GitHub。" />
   <title>毕业留言圣诞树</title>
   <link rel="stylesheet" href="./style.css" />
 </head>
 <body>
-  <canvas id="fireworks" aria-hidden="true"></canvas>
-  <div class="aurora" aria-hidden="true"></div>
-  <div class="snow" aria-hidden="true"></div>
+  <canvas id="trailCanvas" aria-hidden="true"></canvas>
+  <canvas id="fireworkCanvas" aria-hidden="true"></canvas>
+  <div class="night-sky" aria-hidden="true"><span></span><span></span><span></span></div>
+  <div class="vignette" aria-hidden="true"></div>
 
-  <main class="app-shell">
-    <section class="hero glass-card">
-      <div class="hero-copy">
-        <p class="eyebrow">Graduation Wish Tree</p>
-        <h1>把毕业留言挂在圣诞树上</h1>
-        <p class="subtitle">愿我们各自闪闪发光，也能在未来顶峰相见。</p>
+  <main class="page">
+    <section class="hero-panel glass">
+      <div class="hero-text">
+        <p class="eyebrow">Graduation Wish Tree · 2026</p>
+        <h1>把毕业留言挂到发光的圣诞树上</h1>
+        <p class="lead">每一句祝福都会变成树上的一张小纸条。点击天空或按钮，烟花会从底部真实发射、上升、爆开、坠落。</p>
         <div class="hero-actions">
-          <button id="boomBtn" class="btn primary" type="button">放一场烟花</button>
+          <button id="launchBtn" class="btn primary" type="button">发射烟花</button>
+          <button id="finaleBtn" class="btn ghost" type="button">连发模式</button>
           <button id="refreshBtn" class="btn ghost" type="button">刷新留言</button>
         </div>
-        <div class="stats" aria-label="留言统计">
+        <div class="status-row">
           <span><b id="wishCount">0</b> 条留言</span>
           <span id="syncStatus">正在连接 GitHub 留言库…</span>
         </div>
@@ -37,36 +39,38 @@
         </label>
         <label>
           <span>留言内容</span>
-          <textarea id="textInput" name="text" maxlength="80" rows="3" placeholder="写一句想挂在树上的话" required></textarea>
+          <textarea id="textInput" name="text" maxlength="90" rows="3" placeholder="写一句想留给大家的话" required></textarea>
         </label>
         <input id="websiteInput" class="hidden-field" name="website" tabindex="-1" autocomplete="off" />
         <button id="submitBtn" class="btn submit" type="submit">挂到圣诞树上</button>
-        <p class="form-tip">提交后 <code>data/messages.json</code>，刷新后仍然存在。</p>
+        <p class="form-tip">提交成功后写入 GitHub 的 <code>data/messages.json</code>，所有人刷新都能看到。</p>
       </form>
     </section>
 
-    <section class="tree-section" aria-label="留言圣诞树区域">
-      <div class="tree-tools glass-chip">
-        <span>点击树上的留言可以查看大卡片</span>
+    <section class="tree-stage" aria-label="留言圣诞树">
+      <div class="tree-toolbar glass-chip">
+        <span>点击树上的留言可以展开查看</span>
         <button id="shuffleBtn" type="button">重新排列</button>
       </div>
-      <div class="tree-wrap">
-        <div class="tree-glow" aria-hidden="true"></div>
-        <div class="tree" id="tree">
-          <div class="tree-star" aria-hidden="true">★</div>
-          <div class="tree-layer layer-1" aria-hidden="true"></div>
-          <div class="tree-layer layer-2" aria-hidden="true"></div>
-          <div class="tree-layer layer-3" aria-hidden="true"></div>
-          <div class="tree-layer layer-4" aria-hidden="true"></div>
-          <div class="tree-trunk" aria-hidden="true"></div>
-          <div class="tree-base">2026 · 毕业快乐</div>
-          <div id="treeMessages" class="tree-messages"></div>
+
+      <div class="tree-scene">
+        <div class="moon" aria-hidden="true"></div>
+        <div class="snow-ground" aria-hidden="true"></div>
+        <div id="tree" class="pine-tree" aria-label="留言圣诞树">
+          <div class="halo" aria-hidden="true"></div>
+          <div class="star" aria-hidden="true">★</div>
+          <div class="tree-shadow" aria-hidden="true"></div>
+          <div id="branches" class="branches" aria-hidden="true"></div>
+          <div id="lights" class="lights" aria-hidden="true"></div>
+          <div id="wishTags" class="wish-tags"></div>
+          <div class="trunk" aria-hidden="true"></div>
+          <div class="tree-plaque">毕业快乐 · 前程似锦</div>
         </div>
       </div>
     </section>
 
-    <section class="wall glass-card">
-      <div class="section-title">
+    <section class="wall glass">
+      <div class="section-head">
         <p class="eyebrow">Message Wall</p>
         <h2>全部留言</h2>
       </div>
@@ -79,6 +83,7 @@
     <p id="dialogName" class="dialog-name"></p>
     <p id="dialogText" class="dialog-text"></p>
     <p id="dialogTime" class="dialog-time"></p>
+    <button id="dialogFirework" class="btn primary dialog-firework" type="button">为这句留言放烟花</button>
   </dialog>
 
   <template id="emptyTpl">

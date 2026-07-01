@@ -1,11 +1,10 @@
 {
-  "name": "graduation-wish-tree-cf",
+  "name": "graduation-wish-tree-pro",
   "version": "2.0.0",
   "private": true,
-  "description": "毕业留言圣诞树：Cloudflare Pages + GitHub JSON storage",
+  "description": "毕业留言圣诞树：真实发射烟花、圣诞树留言、Cloudflare Pages Functions 写入 GitHub。",
   "scripts": {
-    "dev": "wrangler pages dev public",
-    "deploy": "wrangler pages deploy public"
+    "deploy": "wrangler pages deploy public --project-name=graduation-wish-tree --branch=main"
   },
   "devDependencies": {
     "wrangler": "latest"

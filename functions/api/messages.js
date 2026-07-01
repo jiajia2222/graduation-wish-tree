@@ -184,7 +184,7 @@ function validateMessage(body) {
   }
 
   const name = clean(body.name || '匿名同学', 16) || '匿名同学';
-  const text = clean(body.text, 80);
+  const text = clean(body.text, 90);
 
   if (!text) return { ok: false, error: '留言不能为空。' };
   if (text.length < 2) return { ok: false, error: '留言太短啦。' };
@@ -201,7 +201,7 @@ function normalizeMessages(list) {
     .map((item, index) => ({
       id: clean(item.id || `wish-${index}`, 80),
       name: clean(item.name || '匿名同学', 16) || '匿名同学',
-      text: clean(item.text || '', 80),
+      text: clean(item.text || '', 90),
       createdAt: clean(item.createdAt || item.time || '', 40)
     }))
     .filter((item) => item.text);
