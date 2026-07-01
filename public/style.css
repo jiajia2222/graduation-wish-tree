@@ -93,8 +93,8 @@ button { cursor: pointer; }
   border: 1px solid var(--line);
   background: linear-gradient(135deg, rgba(255,255,255,0.14), rgba(255,255,255,0.05));
   box-shadow: var(--shadow);
-  backdrop-filter: blur(24px) saturate(150%);
-  -webkit-backdrop-filter: blur(24px) saturate(150%);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
 }
 
 .hero-panel {
@@ -326,4 +326,14 @@ h2 { margin-bottom: 16px; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; }
+}
+
+
+/* performance patch: lighter mobile effects */
+@media (max-width: 700px), (prefers-reduced-motion: reduce) {
+  .night-sky span { filter: blur(24px); opacity: 0.10; }
+  .glass, .glass-chip { backdrop-filter: blur(8px) saturate(120%); -webkit-backdrop-filter: blur(8px) saturate(120%); }
+  .light { animation-duration: 2.8s !important; }
+  .wish-tag { animation: tagDrop 0.42s ease both !important; }
+  #trailCanvas { opacity: 0.78; }
 }

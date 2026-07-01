@@ -277,7 +277,7 @@ async function submitWish(event) {
     dom.wishForm.reset();
     setStatus('留言已写入 GitHub，已挂到树上', 'ok');
     render();
-    fireworks.finale(5);
+    fireworks.finale(3);
   } catch (error) {
     setStatus(error.message || '提交失败，请检查 API 配置', 'error');
   } finally {
@@ -290,26 +290,37 @@ class FireworksEngine {
   constructor(trailCanvas, mainCanvas) {
     this.trailCanvas = trailCanvas;
     this.mainCanvas = mainCanvas;
-    this.tctx = trailCanvas.getContext('2d');
-    this.ctx = mainCanvas.getContext('2d');
+    this.tctx = trailCanvas.getContext('2d', { alpha: true });
+    this.ctx = mainCanvas.getContext('2d', { alpha: true });
     this.width = 0;
     this.height = 0;
     this.dpr = 1;
     this.rockets = [];
     this.particles = [];
-    this.smoke = [];
     this.last = performance.now();
-    this.autoTimer = 0;
+    this.frameGap = 16;
+    this.frameAcc = 0;
+    this.autoTimer = 4200;
     this.audio = null;
-    this.lowPower = matchMedia('(max-width: 520px)').matches || navigator.hardwareConcurrency <= 4;
+    this.lowPower = matchMedia('(max-width: 700px)').matches || (navigator.hardwareConcurrency || 4) <= 4 || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.maxRockets = this.lowPower ? 2 : 4;
+    this.maxParticles = this.lowPower ? 180 : 360;
+    this.burstCount = this.lowPower ? 42 : 74;
     this.resize();
     window.addEventListener('resize', () => this.resize(), { passive: true });
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState !== 'visible') {
+        this.rockets.length = 0;
+        this.particles.length = 0;
+        this.clear();
+      }
+    });
     this.loop = this.loop.bind(this);
     requestAnimationFrame(this.loop);
   }
 
   resize() {
-    const dpr = Math.min(window.devicePixelRatio || 1, this.lowPower ? 1.55 : 2);
+    const dpr = Math.min(window.devicePixelRatio || 1, this.lowPower ? 1 : 1.35);
     this.dpr = dpr;
     this.width = window.innerWidth;
     this.height = window.innerHeight;
@@ -321,6 +332,12 @@ class FireworksEngine {
       const ctx = canvas.getContext('2d');
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
+    this.clear();
+  }
+
+  clear() {
+    this.tctx.clearRect(0, 0, this.width, this.height);
+    this.ctx.clearRect(0, 0, this.width, this.height);
   }
 
   ensureAudio() {
@@ -331,7 +348,7 @@ class FireworksEngine {
   }
 
   beep(type = 'launch') {
-    if (!this.audio || this.audio.state === 'suspended') return;
+    if (!this.audio || this.audio.state === 'suspended' || this.lowPower) return;
     const now = this.audio.currentTime;
     const osc = this.audio.createOscillator();
     const gain = this.audio.createGain();
@@ -339,42 +356,41 @@ class FireworksEngine {
     gain.connect(this.audio.destination);
     if (type === 'launch') {
       osc.type = 'sine';
-      osc.frequency.setValueAtTime(220, now);
-      osc.frequency.exponentialRampToValueAtTime(620, now + 0.18);
+      osc.frequency.setValueAtTime(180, now);
+      osc.frequency.exponentialRampToValueAtTime(520, now + 0.18);
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.045, now + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.22);
+      gain.gain.exponentialRampToValueAtTime(0.028, now + 0.025);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.2);
       osc.start(now);
-      osc.stop(now + 0.24);
+      osc.stop(now + 0.22);
     } else {
       osc.type = 'triangle';
-      osc.frequency.setValueAtTime(120, now);
-      osc.frequency.exponentialRampToValueAtTime(42, now + 0.34);
+      osc.frequency.setValueAtTime(90, now);
+      osc.frequency.exponentialRampToValueAtTime(36, now + 0.28);
       gain.gain.setValueAtTime(0.0001, now);
-      gain.gain.exponentialRampToValueAtTime(0.11, now + 0.018);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.42);
+      gain.gain.exponentialRampToValueAtTime(0.07, now + 0.018);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.34);
       osc.start(now);
-      osc.stop(now + 0.45);
+      osc.stop(now + 0.36);
     }
   }
 
   launch(options = {}) {
-    const fromX = options.fromX ?? (this.width * (0.12 + Math.random() * 0.76));
-    const targetX = options.x ?? (this.width * (0.12 + Math.random() * 0.76));
-    const targetY = options.y ?? (this.height * (0.13 + Math.random() * 0.38));
-    const distance = Math.max(240, this.height - targetY);
-    const frames = 58 + Math.random() * 28;
-    const gravity = 0.09 + Math.random() * 0.025;
-    const vy = -(distance / frames + gravity * frames * 0.5);
-    const vx = (targetX - fromX) / frames;
+    if (this.rockets.length >= this.maxRockets) return;
     const palette = options.palette || fireworkPalettes[Math.floor(Math.random() * fireworkPalettes.length)];
+    const fromX = options.fromX ?? this.width * (0.15 + Math.random() * 0.7);
+    const targetX = options.x ?? this.width * (0.14 + Math.random() * 0.72);
+    const targetY = options.y ?? this.height * (0.12 + Math.random() * 0.42);
+    const frames = this.lowPower ? 46 + Math.random() * 18 : 54 + Math.random() * 24;
+    const gravity = 0.075 + Math.random() * 0.02;
+    const distance = Math.max(190, this.height - targetY);
     this.rockets.push({
       x: fromX,
-      y: this.height + 18,
+      y: this.height + 8,
       px: fromX,
-      py: this.height + 18,
-      vx,
-      vy,
+      py: this.height + 8,
+      vx: (targetX - fromX) / frames,
+      vy: -(distance / frames + gravity * frames * 0.48),
       gravity,
       targetY,
       color: palette[0],
@@ -386,68 +402,63 @@ class FireworksEngine {
   }
 
   randomType() {
-    const types = ['peony', 'chrysanthemum', 'willow', 'ring', 'palm', 'crackle'];
+    const types = this.lowPower ? ['peony', 'ring', 'willow'] : ['peony', 'ring', 'willow', 'palm', 'crackle'];
     return types[Math.floor(Math.random() * types.length)];
   }
 
-  finale(count = 9) {
-    for (let i = 0; i < count; i += 1) {
+  finale(count = 5) {
+    const safeCount = Math.min(count, this.lowPower ? 3 : 6);
+    for (let i = 0; i < safeCount; i += 1) {
       setTimeout(() => this.launch({
         fromX: this.width * (0.15 + Math.random() * 0.7),
-        x: this.width * (0.1 + Math.random() * 0.8),
-        y: this.height * (0.1 + Math.random() * 0.46)
-      }), i * 180 + Math.random() * 140);
+        x: this.width * (0.12 + Math.random() * 0.76),
+        y: this.height * (0.12 + Math.random() * 0.44)
+      }), i * (this.lowPower ? 360 : 240));
     }
   }
 
   explode(rocket) {
     this.beep('boom');
-    const baseCount = this.lowPower ? 72 : 128;
-    const count = rocket.type === 'crackle' ? baseCount + 42 : baseCount;
-    const ring = rocket.type === 'ring';
-    const willow = rocket.type === 'willow';
-    const palm = rocket.type === 'palm';
-    const chrys = rocket.type === 'chrysanthemum';
-
+    const remaining = Math.max(0, this.maxParticles - this.particles.length);
+    const count = Math.min(remaining, rocket.type === 'crackle' ? this.burstCount + 18 : this.burstCount);
+    if (count <= 0) return;
+    const isRing = rocket.type === 'ring';
+    const isWillow = rocket.type === 'willow';
+    const isPalm = rocket.type === 'palm';
     for (let i = 0; i < count; i += 1) {
-      const angle = ring ? (Math.PI * 2 * i) / count : Math.random() * Math.PI * 2;
-      const radiusBias = chrys ? Math.sqrt(Math.random()) : Math.random();
-      const speed = ring ? 3.9 + Math.random() * 0.7 : (palm ? 2.1 + Math.random() * 4.6 : 1.4 + radiusBias * 5.6);
+      const angle = isRing ? (Math.PI * 2 * i) / count : Math.random() * Math.PI * 2;
+      const speed = isRing ? 3.4 + Math.random() * 0.45 : isPalm ? 2 + Math.random() * 4.2 : 1.2 + Math.random() * 4.8;
       const color = rocket.palette[i % rocket.palette.length];
+      const fade = isWillow ? 88 + Math.random() * 42 : 46 + Math.random() * 42;
       this.particles.push({
         x: rocket.x,
         y: rocket.y,
         px: rocket.x,
         py: rocket.y,
-        vx: Math.cos(angle) * speed * (willow ? 0.74 : 1),
-        vy: Math.sin(angle) * speed * (willow ? 0.58 : 1) - (palm ? Math.random() * 1.8 : 0),
-        gravity: willow ? 0.078 : 0.045 + Math.random() * 0.025,
-        drag: willow ? 0.986 : 0.972 + Math.random() * 0.012,
-        life: willow ? 118 + Math.random() * 45 : 58 + Math.random() * 52,
-        maxLife: 0,
-        size: willow ? 1.6 + Math.random() * 1.3 : 1.1 + Math.random() * 1.8,
+        vx: Math.cos(angle) * speed * (isWillow ? 0.7 : 1),
+        vy: Math.sin(angle) * speed * (isWillow ? 0.55 : 1) - (isPalm ? Math.random() * 1.6 : 0),
+        gravity: isWillow ? 0.072 : 0.045 + Math.random() * 0.018,
+        drag: isWillow ? 0.987 : 0.974,
+        life: fade,
+        maxLife: fade,
+        size: isWillow ? 1.35 : 1.05 + Math.random() * 1.05,
         color,
-        glitter: rocket.type === 'crackle' || Math.random() < 0.18
+        sparkle: rocket.type === 'crackle' && !this.lowPower && Math.random() < 0.18
       });
-      const p = this.particles[this.particles.length - 1];
-      p.maxLife = p.life;
-    }
-
-    for (let i = 0; i < 10; i += 1) {
-      this.smoke.push({ x: rocket.x, y: rocket.y, r: 8 + Math.random() * 18, life: 34 + Math.random() * 20, vx: (Math.random() - 0.5) * 0.8, vy: -Math.random() * 0.5 });
     }
   }
 
   update(dt) {
-    const step = Math.min(dt / 16.67, 2.2);
+    const step = Math.min(dt / 16.67, 1.8);
     for (let i = this.rockets.length - 1; i >= 0; i -= 1) {
       const r = this.rockets[i];
-      r.px = r.x; r.py = r.y;
+      r.px = r.x;
+      r.py = r.y;
       r.x += r.vx * step;
       r.y += r.vy * step;
       r.vy += r.gravity * step;
       r.age += step;
-      if (r.vy >= -0.25 || r.y <= r.targetY || r.age > 125) {
+      if (r.vy >= -0.18 || r.y <= r.targetY || r.age > 110) {
         this.explode(r);
         this.rockets.splice(i, 1);
       }
@@ -455,29 +466,32 @@ class FireworksEngine {
 
     for (let i = this.particles.length - 1; i >= 0; i -= 1) {
       const p = this.particles[i];
-      p.px = p.x; p.py = p.y;
+      p.px = p.x;
+      p.py = p.y;
       p.x += p.vx * step;
       p.y += p.vy * step;
       p.vx *= Math.pow(p.drag, step);
       p.vy = p.vy * Math.pow(p.drag, step) + p.gravity * step;
       p.life -= step;
-      if (p.glitter && Math.random() < 0.025 && this.particles.length < (this.lowPower ? 420 : 900)) {
+      if (p.sparkle && Math.random() < 0.018 && this.particles.length < this.maxParticles) {
+        const life = 12 + Math.random() * 12;
         this.particles.push({
-          x: p.x, y: p.y, px: p.x, py: p.y,
-          vx: (Math.random() - 0.5) * 1.5,
-          vy: (Math.random() - 0.5) * 1.5,
-          gravity: 0.035, drag: 0.95,
-          life: 14 + Math.random() * 14,
-          maxLife: 28, size: 0.8, color: '#ffffff', glitter: false
+          x: p.x,
+          y: p.y,
+          px: p.x,
+          py: p.y,
+          vx: (Math.random() - 0.5) * 1.2,
+          vy: (Math.random() - 0.5) * 1.2,
+          gravity: 0.03,
+          drag: 0.95,
+          life,
+          maxLife: life,
+          size: 0.8,
+          color: '#ffffff',
+          sparkle: false
         });
       }
-      if (p.life <= 0 || p.y > this.height + 60) this.particles.splice(i, 1);
-    }
-
-    for (let i = this.smoke.length - 1; i >= 0; i -= 1) {
-      const s = this.smoke[i];
-      s.x += s.vx * step; s.y += s.vy * step; s.r += 0.08 * step; s.life -= step;
-      if (s.life <= 0) this.smoke.splice(i, 1);
+      if (p.life <= 0 || p.y > this.height + 40 || p.x < -40 || p.x > this.width + 40) this.particles.splice(i, 1);
     }
   }
 
@@ -485,71 +499,60 @@ class FireworksEngine {
     const tctx = this.tctx;
     const ctx = this.ctx;
     tctx.globalCompositeOperation = 'source-over';
-    tctx.fillStyle = 'rgba(2, 4, 13, 0.18)';
+    tctx.fillStyle = this.lowPower ? 'rgba(2, 4, 13, 0.30)' : 'rgba(2, 4, 13, 0.22)';
     tctx.fillRect(0, 0, this.width, this.height);
     ctx.clearRect(0, 0, this.width, this.height);
 
-    ctx.globalCompositeOperation = 'screen';
-    for (const s of this.smoke) {
-      const a = Math.max(0, s.life / 54) * 0.09;
-      ctx.beginPath();
-      ctx.fillStyle = `rgba(190, 205, 225, ${a})`;
-      ctx.arc(s.x, s.y, s.r, 0, Math.PI * 2);
-      ctx.fill();
-    }
-
     tctx.globalCompositeOperation = 'lighter';
     ctx.globalCompositeOperation = 'lighter';
+    tctx.lineCap = 'round';
+    ctx.lineCap = 'round';
 
     for (const r of this.rockets) {
-      const grad = tctx.createLinearGradient(r.px, r.py, r.x, r.y);
-      grad.addColorStop(0, 'rgba(255,255,255,0)');
-      grad.addColorStop(0.42, r.color);
-      grad.addColorStop(1, '#ffffff');
-      tctx.strokeStyle = grad;
-      tctx.lineWidth = 2.2;
+      tctx.strokeStyle = r.color;
+      tctx.lineWidth = this.lowPower ? 1.6 : 2.2;
       tctx.beginPath();
       tctx.moveTo(r.px, r.py);
       tctx.lineTo(r.x, r.y);
       tctx.stroke();
-
       ctx.fillStyle = '#ffffff';
-      ctx.shadowColor = r.color;
-      ctx.shadowBlur = 18;
       ctx.beginPath();
-      ctx.arc(r.x, r.y, 2.4, 0, Math.PI * 2);
+      ctx.arc(r.x, r.y, this.lowPower ? 2.1 : 2.6, 0, Math.PI * 2);
       ctx.fill();
-      ctx.shadowBlur = 0;
     }
 
     for (const p of this.particles) {
       const life = Math.max(0, p.life / p.maxLife);
-      tctx.strokeStyle = hexToRgba(p.color, life * 0.66);
+      const alpha = life * life;
+      tctx.strokeStyle = hexToRgba(p.color, alpha * 0.72);
       tctx.lineWidth = p.size;
       tctx.beginPath();
       tctx.moveTo(p.px, p.py);
       tctx.lineTo(p.x, p.y);
       tctx.stroke();
-
-      ctx.fillStyle = hexToRgba(p.color, Math.min(1, life * 1.35));
-      ctx.shadowColor = p.color;
-      ctx.shadowBlur = 10 * life;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size * (0.72 + life * 0.65), 0, Math.PI * 2);
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      if (!this.lowPower || life > 0.35) {
+        ctx.fillStyle = hexToRgba(p.color, Math.min(1, alpha * 1.3));
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.size * (0.75 + life * 0.55), 0, Math.PI * 2);
+        ctx.fill();
+      }
     }
   }
 
   loop(now) {
     const dt = now - this.last;
     this.last = now;
-    this.update(dt);
-    this.render();
-    this.autoTimer -= dt;
-    if (this.autoTimer <= 0) {
-      this.autoTimer = 980 + Math.random() * 1700;
-      if (document.visibilityState === 'visible') this.launch();
+    this.frameAcc += dt;
+    const targetGap = this.lowPower ? 33 : 16;
+    if (this.frameAcc >= targetGap) {
+      this.update(this.frameAcc);
+      this.render();
+      this.autoTimer -= this.frameAcc;
+      this.frameAcc = 0;
+      if (this.autoTimer <= 0) {
+        this.autoTimer = this.lowPower ? 11000 + Math.random() * 7000 : 6500 + Math.random() * 5500;
+        if (document.visibilityState === 'visible') this.launch();
+      }
     }
     requestAnimationFrame(this.loop);
   }
@@ -586,12 +589,12 @@ function initEvents() {
       return;
     }
     dom.finaleBtn.textContent = '停止连发';
-    fireworks.finale(8);
-    finaleTimer = setInterval(() => fireworks.finale(6), 2500);
+    fireworks.finale(4);
+    finaleTimer = setInterval(() => fireworks.finale(3), 5200);
   });
   dom.dialogFirework.addEventListener('click', () => {
     fireworks.ensureAudio();
-    fireworks.finale(activeDialogMessage ? 6 : 4);
+    fireworks.finale(activeDialogMessage ? 3 : 2);
   });
   dom.closeDialog.addEventListener('click', () => dom.dialog.close());
   dom.dialog.addEventListener('click', (event) => {
@@ -612,4 +615,4 @@ buildBranches();
 buildLights();
 initEvents();
 loadMessages();
-setTimeout(() => fireworks.finale(5), 700);
+setTimeout(() => fireworks.finale(2), 900);
